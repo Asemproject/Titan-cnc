@@ -1,16 +1,29 @@
-name: Build Titan-CNC APK
+name: Build Titan-CNC APK (Debug Mode)
 
 on:
   push:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
       
+    - name: DEBUG - Check repository structure
+      run: |
+        echo "=== ROOT DIRECTORY ==="
+        ls -la
+        echo ""
+        echo "=== CHECKING FOR GRADLE FILES ==="
+        find . -name "build.gradle*" -type f 2>/dev/null | head -10
+        echo ""
+        echo "=== CHECKING FOR APP DIRECTORY ==="
+        ls -la app/ 2>/dev/null || echo "No app/ directory"
+        
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -20,29 +33,30 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Setup Gradle (cache disabled sementara)
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        cache-disabled: true  # Disable karena service down
-        
-    - name: Grant execute permission
+    - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace
-      
-    - name: Debug - Find APK location
+    - name: DEBUG - Check available Gradle tasks
       run: |
-        echo "=== Mencari APK ==="
-        find . -name "*.apk" -type f 2>/dev/null || echo "Tidak ada APK"
-        echo "=== Struktur build ==="
-        ls -R app/build/outputs/ 2>/dev/null || echo "Directory tidak ada"
+        echo "=== AVAILABLE ASSEMBLE TASKS ==="
+        ./gradlew tasks --all 2>/dev/null | grep -i assemble || echo "No assemble tasks found"
         
-    - name: Upload APK
+    - name: Build Debug APK with full logging
+      run: |
+        ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log
+        
+    - name: DEBUG - Search for APK files
+      run: |
+        echo "=== SEARCHING ALL APK FILES ==="
+        find . -name "*.apk" -type f 2>/dev/null
+        
+        echo ""
+        echo "=== CHECKING BUILD OUTPUTS ==="
+        ls -laR app/build/outputs/ 2>/dev/null || echo "app/build/outputs NOT FOUND"
+        
+    - name: Upload build log
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: titancnc-debug
-        path: |
-          app/build/outputs/apk/**/*.apk
-          **/build/outputs/apk/**/*.apk
-        if-no-files-found: warn
+        name: build-logs
+        path: build.log
