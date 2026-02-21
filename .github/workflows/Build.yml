@@ -25,41 +25,41 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Cache Gradle packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-          
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
     - name: Run lint
-      run: ./gradlew lintDebug
+      run: ./gradlew lintDebug --no-daemon
       
     - name: Build Debug APK
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --no-daemon
       
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon
+
+    # 🔍 Debug output location (penting!)
+    - name: List build outputs
+      run: |
+        echo "==== APK Files ===="
+        find app -type f -name "*.apk" || true
+        echo "==== AAB Files ===="
+        find app -type f -name "*.aab" || true
+
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: TitanCNC-Debug-APK
-        path: app/build/outputs/apk/debug/*.apk
+        path: app/build/outputs/**/*.apk
         retention-days: 30
+        if-no-files-found: ignore
         
-    - name: Build Release APK
-      run: ./gradlew assembleRelease
-      
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
         name: TitanCNC-Release-APK
-        path: app/build/outputs/apk/release/*.apk
+        path: app/build/outputs/**/*.apk
         retention-days: 30
+        if-no-files-found: ignore
 
   test:
     runs-on: ubuntu-latest
@@ -82,11 +82,15 @@ jobs:
       run: chmod +x gradlew
       
     - name: Run Unit Tests
-      run: ./gradlew testDebugUnitTest
+      run: ./gradlew testDebugUnitTest --no-daemon
       
     - name: Upload Test Results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: test-results
-        path: app/build/reports/tests/
+        path: |
+          app/build/reports/tests/**
+          app/build/test-results/**
         retention-days: 7
+        if-no-files-found: ignore
