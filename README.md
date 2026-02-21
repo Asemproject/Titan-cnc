@@ -1,335 +1,250 @@
-# GitHub Setup & Build Guide for Titan CNC
+# Titan CNC - Ultimate Offline Android CNC Controller
 
-Panduan lengkap untuk setup repository GitHub dan build aplikasi Titan CNC secara otomatis.
+A full-featured, offline-first Android CNC Controller app designed for workshop environments. Supports GRBL v1.1, grblHAL, and FluidNC firmware.
 
-## 📁 Struktur Repository
+## Features
+
+### 🔌 Connectivity & Streaming (100% Offline)
+- **USB OTG Support**: CH340, CP2102, FTDI, PL2303 using `usb-serial-for-android`
+- **Wireless**: Bluetooth Classic/BLE and Local Wi-Fi (Telnet/WebSocket for FluidNC/grblHAL)
+- **Protocol**: Character Counting buffer management to prevent machine stuttering
+
+### 📊 Dynamic Dashboard & Jogging
+- **Real-time DRO**: Machine (MPos) & Work Position (WPos) with Zero/Home/Probe functions
+- **Fluid Jogging**: Haptic-feedback D-Pad for X, Y, Z, and A-axis
+- **Overrides**: Responsive sliders for Feed Rate (10-200%) and Spindle Speed (RPM)
+- **Safety**: High-contrast Floating Emergency Stop (E-Stop) button
+
+### 📝 Integrated Advanced Editors
+- **G-Code Editor**: Syntax highlighting for G/M codes, Find & Replace, Line Numbering
+- **YAML/Config Editor**: Custom UI to edit FluidNC 'config.yaml' or GRBL '$$' settings directly
+- **Image-to-GCode Converter**:
+  - Raster-to-GCode engine using OpenCV
+  - Dithering (Floyd-Steinberg, Atkinson, Jarvis-Judice-Ninke)
+  - Thresholding (Binary, Adaptive, Otsu)
+  - Power Scaling (S-min/max) and Scan Direction (H/V/Diag)
+  - Real-time path preview before sending
+
+### 🔧 Tool & Bit Library (Local Database)
+- **Tool Manager**: Room Database to store router bits (Endmill, V-bit, Ballnose)
+- **Parameters**: Diameter, Flutes, Max Depth, Recommended Feed/Speed
+- **Chipload Calculator**: Built-in calculator to suggest optimal Feed Rate based on bit and material
+
+### 🎨 Visualizer & UI/UX
+- **Tech Stack**: Kotlin + Jetpack Compose (Material 3)
+- **3D Visualizer**: High-performance OpenGL ES engine for real-time toolpath tracking
+- **Adaptive Layout**:
+  - Phone: Bottom-tabbed navigation (Dashboard, Editor, Tool, Console)
+  - Tablet: Multi-pane "Command Center" layout for larger screens
+- **Visual Style**: "Industrial Cyber-Dark" theme (#121212 background with #00E5FF accents)
+
+## Architecture
+
+- **MVVM Pattern**: With Coroutines and StateFlow for reactive UI updates
+- **Dependency Injection**: Hilt
+- **Database**: Room for local tool storage
+- **Image Processing**: OpenCV 4.9.0
+- **Serial Communication**: usb-serial-for-android 3.7.0
+
+## Project Structure
 
 ```
 TitanCNC/
-├── .github/
-│   └── workflows/
-│       ├── build.yml      # Build otomatis setiap push
-│       └── release.yml    # Release dengan signed APK
 ├── app/
-│   ├── build.gradle.kts
-│   └── src/
+│   ├── src/main/java/com/titancnc/
+│   │   ├── data/
+│   │   │   ├── database/     # Room database and DAOs
+│   │   │   └── model/        # Data models (Tool, etc.)
+│   │   ├── di/               # Hilt dependency injection modules
+│   │   ├── service/          # Core services
+│   │   │   ├── ConnectionManager.kt    # USB/BT/WiFi connectivity
+│   │   │   └── GCodeSender.kt          # GRBL streaming with buffer management
+│   │   ├── ui/
+│   │   │   ├── screens/      # Compose screens
+│   │   │   │   ├── DashboardScreen.kt
+│   │   │   │   ├── GCodeEditorScreen.kt
+│   │   │   │   ├── ToolLibraryScreen.kt
+│   │   │   │   └── ConsoleScreen.kt
+│   │   │   ├── theme/        # Material 3 theme
+│   │   │   └── viewmodel/    # ViewModels
+│   │   ├── utils/            # Utilities
+│   │   │   ├── ChiploadCalculator.kt
+│   │   │   └── ImageToGcodeConverter.kt
+│   │   ├── visualizer/       # OpenGL ES visualizer
+│   │   │   └── GCodeVisualizer.kt
+│   │   ├── MainActivity.kt
+│   │   └── TitanCNCApplication.kt
+│   ├── src/main/cpp/         # Native code for OpenCV
+│   ├── src/main/res/         # Android resources
+│   └── build.gradle.kts
 ├── gradle/
+│   └── libs.versions.toml    # Version catalog
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradlew
-├── gradlew.bat
-├── gradle.properties
-├── local.properties (tidak di-commit)
 └── README.md
 ```
 
-## 🚀 Setup Repository GitHub
+## 🚀 Quick Start
 
-### 1. Buat Repository Baru
+### Download Pre-built APK
 
+[![Build Status](https://github.com/YOUR_USERNAME/TitanCNC/workflows/Build%20Titan%20CNC/badge.svg)](https://github.com/YOUR_USERNAME/TitanCNC/actions)
+
+Download the latest APK from [Releases](https://github.com/YOUR_USERNAME/TitanCNC/releases)
+
+---
+
+## 🛠️ Building from Source
+
+### Prerequisites
+- Android Studio Hedgehog (2023.1.1) or later
+- JDK 17 or later
+- Android SDK 35
+- NDK (for OpenCV native code)
+
+### Option 1: Build dengan GitHub Actions (Recommended)
+
+Build otomatis setiap push ke repository:
+
+1. **Fork repository ini**
+2. **Push ke branch `main`**
+3. **GitHub Actions akan otomatis build**
+4. **Download APK dari tab Actions → Artifacts**
+
+#### Setup Release dengan Signed APK
+
+1. Buat keystore:
 ```bash
-# Di GitHub, buat repository baru dengan nama "TitanCNC"
-# Jangan initialize dengan README (sudah ada)
-```
-
-### 2. Push Project ke GitHub
-
-```bash
-# Di folder project TitanCNC
-
-# Initialize git
-git init
-
-# Add semua files
-git add .
-
-# Commit
-git commit -m "Initial commit: Titan CNC v1.0.0"
-
-# Add remote repository
-git remote add origin https://github.com/YOUR_USERNAME/TitanCNC.git
-
-# Push ke main branch
-git branch -M main
-git push -u origin main
-```
-
-### 3. Setup GitHub Actions Secrets (Untuk Signed Release)
-
-Untuk membuat APK yang signed, tambahkan secrets berikut:
-
-#### Buat Keystore Baru
-
-```bash
-# Generate keystore untuk signing APK
-keytool -genkey -v \
-  -keystore titancnc-keystore.jks \
-  -keyalg RSA \
-  -keysize 2048 \
-  -validity 10000 \
-  -alias titancnc
-
-# Encode keystore ke base64
+keytool -genkey -v -keystore titancnc-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias titancnc
 base64 -w 0 titancnc-keystore.jks > keystore-base64.txt
 ```
 
-#### Tambahkan Secrets di GitHub
+2. Tambahkan secrets di GitHub (Settings → Secrets → Actions):
+   - `KEYSTORE_BASE64`: Isi dari `keystore-base64.txt`
+   - `KEYSTORE_PASSWORD`: Password keystore
+   - `KEY_ALIAS`: `titancnc`
+   - `KEY_PASSWORD`: Password key
 
-1. Buka repository GitHub → Settings → Secrets and variables → Actions
-2. Klik "New repository secret"
-3. Tambahkan secrets berikut:
-
-| Secret Name | Value |
-|-------------|-------|
-| `KEYSTORE_BASE64` | Isi dari file `keystore-base64.txt` |
-| `KEYSTORE_PASSWORD` | Password keystore yang Anda buat |
-| `KEY_ALIAS` | Alias key (misal: titancnc) |
-| `KEY_PASSWORD` | Password key |
-
-## 🔧 Build Otomatis dengan GitHub Actions
-
-### Build Debug APK (Setiap Push)
-
-Setiap kali Anda push ke branch `main` atau `develop`, GitHub Actions akan:
-1. Build Debug APK
-2. Run unit tests
-3. Upload APK sebagai artifact
-
-**Download APK:**
-- Buka tab "Actions" di repository
-- Pilih workflow "Build Titan CNC"
-- Klik artifact "TitanCNC-Debug-APK"
-
-### Build Release APK (Manual/Tag)
-
-#### Opsi 1: Push Tag
-
+3. Push tag untuk release:
 ```bash
-# Buat tag baru
-git tag -a v1.0.0 -m "Release version 1.0.0"
-
-# Push tag
+git tag -a v1.0.0 -m "Release v1.0.0"
 git push origin v1.0.0
 ```
 
-GitHub Actions akan otomatis:
-1. Build signed release APK
-2. Create GitHub Release
-3. Upload APK ke release
+### Option 2: Build Lokal dengan Android Studio
 
-#### Opsi 2: Manual Trigger
-
-1. Buka tab "Actions" di repository
-2. Pilih workflow "Release Titan CNC"
-3. Klik "Run workflow"
-4. Masukkan version number
-5. Klik "Run workflow"
-
-## 🖥️ Build Lokal (Setelah Clone dari GitHub)
-
-### Prerequisites
-
-- Android Studio Hedgehog (2023.1.1) atau lebih baru
-- JDK 17
-- Android SDK 35
-- NDK (untuk OpenCV native code)
-
-### Clone Repository
-
+1. Clone repository:
 ```bash
-# Clone dari GitHub
-git clone https://github.com/YOUR_USERNAME/TitanCNC.git
-
-# Masuk ke folder
-cd TitanCNC
+git clone https://github.com/yourusername/titancnc.git
+cd titancnc
 ```
 
-### Build dengan Android Studio
+2. Open di Android Studio
 
-1. **Open Project**
-   - Buka Android Studio
-   - File → Open → Pilih folder `TitanCNC`
-   - Tunggu Gradle sync selesai
+3. Sync Gradle:
+```bash
+./gradlew --refresh-dependencies
+```
 
-2. **Sync Gradle**
-   - Klik "Sync Now" jika diminta
-   - Atau: File → Sync Project with Gradle Files
+4. Build Debug APK:
+```bash
+./gradlew assembleDebug
+```
 
-3. **Build APK**
-   - Build → Build Bundle(s) / APK(s) → Build APK(s)
-   - Atau tekan: `Ctrl+F9` (Windows/Linux) atau `Cmd+F9` (Mac)
+5. Install ke device:
+```bash
+./gradlew installDebug
+```
 
-4. **Install ke Device**
-   - Hubungkan Android device via USB
-   - Enable USB Debugging di device
-   - Klik "Run" (▶) atau tekan `Shift+F10`
-
-### Build dengan Command Line
+### Option 3: Build dengan Command Line
 
 ```bash
-# Grant permission ke gradlew
+# Grant permission
 chmod +x gradlew
 
-# Build Debug APK
+# Build Debug
 ./gradlew assembleDebug
 
-# Build Release APK (unsigned)
+# Build Release
 ./gradlew assembleRelease
-
-# Build dan install ke device yang terhubung
-./gradlew installDebug
 
 # Run tests
 ./gradlew test
 
 # Clean build
-./gradlew clean
-
-# Full rebuild
 ./gradlew clean build
 ```
 
-### Lokasi Output APK
+Output APK: `app/build/outputs/apk/debug/app-debug.apk`
 
-| Build Type | Lokasi |
-|------------|--------|
-| Debug | `app/build/outputs/apk/debug/app-debug.apk` |
-| Release | `app/build/outputs/apk/release/app-release-unsigned.apk` |
+### OpenCV Setup
 
-## 📋 Troubleshooting
+The project uses OpenCV 4.9.0 via Gradle:
 
-### Gradle Sync Failed
-
-```bash
-# Clear Gradle cache
-./gradlew cleanBuildCache
-
-# Delete .gradle folder
-rm -rf ~/.gradle/caches/
-
-# Re-sync
-./gradlew --refresh-dependencies
+```kotlin
+implementation("org.opencv:opencv:4.9.0")
 ```
 
-### OpenCV Not Found
+Untuk native code support, pastikan NDK terinstall:
+1. SDK Manager → SDK Tools
+2. Centang "NDK (Side by side)"
+3. Apply
 
-```bash
-# Pastikan OpenCV library tersedia
-# Di build.gradle.kts sudah include:
-# implementation("org.opencv:opencv:4.9.0")
-```
+## Key Components
 
-### NDK Not Found
+### 1. ConnectionManager
+Handles all connectivity options:
+- USB Serial (CH340, CP2102, FTDI, PL2303)
+- Bluetooth Classic/BLE
+- WiFi (Telnet/WebSocket)
 
-1. Buka SDK Manager di Android Studio
-2. Tab "SDK Tools"
-3. Centang "NDK (Side by side)"
-4. Klik "Apply"
+### 2. GCodeSender
+Implements GRBL character counting protocol:
+- 128-byte buffer management
+- Real-time command support
+- Status polling
+- Override controls
 
-### Out of Memory Error
+### 3. ImageToGcodeConverter
+OpenCV-based image processing:
+- Dithering algorithms
+- Thresholding methods
+- Multiple engraving modes
+- Preview generation
 
-```bash
-# Tambahkan di gradle.properties
-org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=512m
-org.gradle.daemon=true
-org.gradle.parallel=true
-org.gradle.configureondemand=true
-```
+### 4. ChiploadCalculator
+Machining parameter calculator:
+- Feed rate calculation
+- Spindle speed optimization
+- Material-specific recommendations
+- Safety validation
 
-## 🔄 Update Dependencies
+## Supported Firmware
 
-```bash
-# Check for dependency updates
-./gradlew dependencyUpdates
+- **GRBL v1.1**: Full support with all features
+- **grblHAL**: Via WebSocket/Telnet
+- **FluidNC**: Via WebSocket with config.yaml editing
 
-# Update version di gradle/libs.versions.toml
-# Lalu sync project
-```
+## Permissions Required
 
-## 📦 Membuat Release Baru
+- `INTERNET`: WiFi connectivity
+- `BLUETOOTH` / `BLUETOOTH_ADMIN`: Bluetooth connectivity
+- `BLUETOOTH_SCAN` / `BLUETOOTH_CONNECT`: Android 12+ Bluetooth
+- `USB_PERMISSION`: USB serial devices
+- `ACCESS_FINE_LOCATION`: Bluetooth LE scanning
+- `READ_EXTERNAL_STORAGE`: G-code file access
 
-### Versioning (Semantic Versioning)
+## License
 
-Format: `MAJOR.MINOR.PATCH`
+MIT License - See LICENSE file for details
 
-- **MAJOR**: Breaking changes
-- **MINOR**: New features, backward compatible
-- **PATCH**: Bug fixes
+## Contributing
 
-### Release Checklist
+Contributions are welcome! Please read CONTRIBUTING.md for guidelines.
 
-```bash
-# 1. Update version di app/build.gradle.kts
-versionCode = 2
-versionName = "1.1.0"
+## Acknowledgments
 
-# 2. Update CHANGELOG.md
-
-# 3. Commit changes
-git add .
-git commit -m "Prepare release v1.1.0"
-
-# 4. Create tag
-git tag -a v1.1.0 -m "Release v1.1.0"
-
-# 5. Push
-git push origin main
-git push origin v1.1.0
-
-# 6. GitHub Actions akan otomatis build dan create release
-```
-
-## 🐳 Build dengan Docker (Optional)
-
-```dockerfile
-# Dockerfile
-FROM openjdk:17-jdk-slim
-
-RUN apt-get update && apt-get install -y \
-    wget \
-    unzip \
-    git
-
-# Download Android SDK
-ENV ANDROID_SDK_ROOT=/opt/android-sdk
-RUN mkdir -p ${ANDROID_SDK_ROOT}
-RUN wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-RUN unzip commandlinetools-linux-9477386_latest.zip -d ${ANDROID_SDK_ROOT}
-RUN rm commandlinetools-linux-9477386_latest.zip
-
-ENV PATH=${PATH}:${ANDROID_SDK_ROOT}/cmdline-tools/bin
-
-# Accept licenses dan install SDK
-RUN yes | sdkmanager --licenses
-RUN sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-WORKDIR /app
-COPY . .
-
-RUN ./gradlew assembleDebug
-```
-
-```bash
-# Build dengan Docker
-docker build -t titancnc-builder .
-docker run -v $(pwd)/output:/app/app/build/outputs titancnc-builder
-```
-
-## 📚 Resources
-
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Android CI/CD with GitHub Actions](https://developer.android.com/studio/build/building-cmdline)
-- [Gradle Build Tool](https://gradle.org/guides/)
-
----
-
-## 💡 Tips
-
-1. **Enable Gradle Daemon**: Mempercepat build berikutnya
-2. **Use Build Cache**: `./gradlew assembleDebug --build-cache`
-3. **Parallel Build**: Sudah di-enable di `gradle.properties`
-4. **Exclude Tests**: `./gradlew assembleDebug -x test` (untuk build lebih cepat)
-
----
-
-**Selamat membangun!** 🚀
+- [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) by mik3y
+- [OpenCV](https://opencv.org/) for image processing
+- [GRBL](https://github.com/gnea/grbl) for the excellent CNC firmware
+- [FluidNC](https://github.com/bdring/FluidNC) for the advanced ESP32 firmware
