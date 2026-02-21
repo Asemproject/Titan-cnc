@@ -3,16 +3,13 @@ name: Build Titan-CNC APK
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -23,17 +20,29 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Setup Gradle with caching
+    - name: Setup Gradle (cache disabled sementara)
       uses: gradle/actions/setup-gradle@v3
-      
-    - name: Grant execute permission for gradlew
+      with:
+        cache-disabled: true  # Disable karena service down
+        
+    - name: Grant execute permission
       run: chmod +x gradlew
       
     - name: Build Debug APK
       run: ./gradlew assembleDebug --stacktrace
       
+    - name: Debug - Find APK location
+      run: |
+        echo "=== Mencari APK ==="
+        find . -name "*.apk" -type f 2>/dev/null || echo "Tidak ada APK"
+        echo "=== Struktur build ==="
+        ls -R app/build/outputs/ 2>/dev/null || echo "Directory tidak ada"
+        
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: titancnc-debug
-        path: app/build/outputs/apk/debug/*.apk
+        path: |
+          app/build/outputs/apk/**/*.apk
+          **/build/outputs/apk/**/*.apk
+        if-no-files-found: warn
