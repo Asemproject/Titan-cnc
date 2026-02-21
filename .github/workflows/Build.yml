@@ -1,4 +1,4 @@
-name: Build Titan-CNC APK (Debug Mode)
+name: Build Titan-CNC APK
 
 on:
   push:
@@ -13,17 +13,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: DEBUG - Check repository structure
-      run: |
-        echo "=== ROOT DIRECTORY ==="
-        ls -la
-        echo ""
-        echo "=== CHECKING FOR GRADLE FILES ==="
-        find . -name "build.gradle*" -type f 2>/dev/null | head -10
-        echo ""
-        echo "=== CHECKING FOR APP DIRECTORY ==="
-        ls -la app/ 2>/dev/null || echo "No app/ directory"
-        
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -32,31 +21,49 @@ jobs:
         
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
-      
+      with:
+        packages: 'build-tools;34.0.0 platforms;android-34'
+        
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        cache-disabled: true
+        
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
-    - name: DEBUG - Check available Gradle tasks
+    - name: Clean and Build
       run: |
-        echo "=== AVAILABLE ASSEMBLE TASKS ==="
-        ./gradlew tasks --all 2>/dev/null | grep -i assemble || echo "No assemble tasks found"
-        
-    - name: Build Debug APK with full logging
+        ./gradlew clean
+        ./gradlew assembleDebug --no-daemon
+      continue-on-error: true
+      
+    - name: Locate and Collect APK
+      id: locate_apk
       run: |
-        ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log
+        mkdir -p final_output
+        APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null)
         
-    - name: DEBUG - Search for APK files
-      run: |
-        echo "=== SEARCHING ALL APK FILES ==="
-        find . -name "*.apk" -type f 2>/dev/null
+        if [ -n "$APK_FILES" ]; then
+          echo "Found APK files:"
+          echo "$APK_FILES"
+          find . -name "*.apk" -type f -exec cp {} final_output/ \;
+          echo "found=true" >> $GITHUB_OUTPUT
+        else
+          echo "ERROR: No APK files found!"
+          echo "found=false" >> $GITHUB_OUTPUT
+        fi
         
-        echo ""
-        echo "=== CHECKING BUILD OUTPUTS ==="
-        ls -laR app/build/outputs/ 2>/dev/null || echo "app/build/outputs NOT FOUND"
-        
-    - name: Upload build log
+    - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
-      if: always()
+      if: steps.locate_apk.outputs.found == 'true'
       with:
-        name: build-logs
-        path: build.log
+        name: Titan-CNC-APK
+        path: final_output/*.apk
+        retention-days: 7
+        
+    - name: Fail if no APK
+      if: steps.locate_apk.outputs.found == 'false'
+      run: |
+        echo "BUILD FAILED: No APK was generated"
+        exit 1
