@@ -1,4 +1,3 @@
-
 name: Release Titan CNC
 
 on:
@@ -30,11 +29,13 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      
     - name: Decode Keystore
       env:
         ENCODED_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 }}
-      run: |
-        echo $ENCODED_KEYSTORE | base64 -d > keystore.jks
+      run: echo $ENCODED_KEYSTORE | base64 -d > keystore.jks
         
     - name: Build Signed Release APK
       env:
@@ -42,12 +43,20 @@ jobs:
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       run: |
-        ./gradlew assembleRelease \
+        ./gradlew assembleRelease --no-daemon \
           -Pandroid.injected.signing.store.file=keystore.jks \
           -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
           -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
           -Pandroid.injected.signing.key.password=$KEY_PASSWORD
           
+    # 🔎 DEBUG – penting!
+    - name: List release outputs
+      run: |
+        echo "==== APK Files ===="
+        find app -type f -name "*.apk" || true
+        echo "==== AAB Files ===="
+        find app -type f -name "*.aab" || true
+
     - name: Get Version
       id: get_version
       run: |
@@ -68,27 +77,9 @@ jobs:
         draft: false
         prerelease: false
         body: |
-          ## Titan CNC v${{ steps.get_version.outputs.VERSION }}
+          Titan CNC v${{ steps.get_version.outputs.VERSION }}
           
-          ### Features
-          - Full GRBL v1.1, grblHAL, FluidNC support
-          - USB OTG, Bluetooth, WiFi connectivity
-          - Real-time DRO with haptic jogging
-          - G-Code editor with syntax highlighting
-          - Image-to-GCode converter
-          - Tool library with chipload calculator
-          - 3D toolpath visualizer
-          
-          ### Installation
-          1. Download `TitanCNC-v${{ steps.get_version.outputs.VERSION }}.apk`
-          2. Enable "Install from Unknown Sources" in Settings
-          3. Install the APK
-          4. Connect your CNC controller via USB/Bluetooth/WiFi
-          
-          ### Requirements
-          - Android 8.0+ (API 26)
-          - USB OTG support (for USB connection)
-          - Bluetooth 4.0+ (for Bluetooth connection)
+          Full GRBL, grblHAL & FluidNC support.
           
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -96,6 +87,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: app/build/outputs/apk/release/app-release.apk
+        asset_path: app/build/outputs/**/*.apk
         asset_name: TitanCNC-v${{ steps.get_version.outputs.VERSION }}.apk
         asset_content_type: application/vnd.android.package-archive
