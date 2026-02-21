@@ -1,0 +1,82 @@
+name: Unpack ZIP and commit
+
+# Manual trigger (workflow_dispatch) with inputs
+on:
+  workflow_dispatch:
+    inputs:
+      zip_path:
+        description: 'Path ke file ZIP di repo (contoh: artifacts/archive.zip) atau path lokal di runner'
+        required: true
+        default: 'archive.zip'
+      target_dir:
+        description: 'Folder tujuan ekstrak (relatif ke repo root)'
+        required: true
+        default: 'extracted'
+      branch:
+        description: 'Branch yang akan di-push'
+        required: true
+        default: 'main'
+
+# Required so the action can push changes
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          # keep credentials so we can push with GITHUB_TOKEN
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Ensure unzip is available
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y unzip
+
+      - name: Show inputs
+        run: |
+          echo "ZIP_PATH=${{ inputs.zip_path }}"
+          echo "TARGET_DIR=${{ inputs.target_dir }}"
+          echo "BRANCH=${{ inputs.branch }}"
+
+      - name: Unpack ZIP
+        env:
+          ZIP_PATH: ${{ inputs.zip_path }}
+          TARGET_DIR: ${{ inputs.target_dir }}
+        run: |
+          # buat folder tujuan
+          mkdir -p "$TARGET_DIR"
+
+          # jika file ZIP ada di repo path
+          if [ -f "$ZIP_PATH" ]; then
+            echo "Menemukan $ZIP_PATH di workspace, mengekstrak..."
+            unzip -o "$ZIP_PATH" -d "$TARGET_DIR"
+          else
+            echo "File $ZIP_PATH tidak ditemukan. Jika file ZIP berada di URL, unduh dulu atau periksa path."
+            exit 1
+          fi
+
+      - name: Commit and push extracted files (if any changes)
+        env:
+          ZIP_PATH: ${{ inputs.zip_path }}
+          TARGET_DIR: ${{ inputs.target_dir }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # tambahkan semua perubahan dari folder target
+          git add --all "$TARGET_DIR"
+
+          # cek ada perubahan staged?
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan untuk di-commit."
+          else
+            git commit -m "Unpack: ${ZIP_PATH} -> ${TARGET_DIR} by GitHub Action"
+            # push ke branch yang ditentukan
+            git push origin ${{ inputs.branch }}
+            echo "Perubahan dipush ke branch ${{ inputs.branch }}."
+          fi
