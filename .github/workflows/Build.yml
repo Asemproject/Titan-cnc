@@ -13,7 +13,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Set up JDK 17
+    - name: Setup Java 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
@@ -24,46 +24,26 @@ jobs:
       with:
         packages: 'build-tools;34.0.0 platforms;android-34'
         
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        cache-disabled: true
-        
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      
-    - name: Clean and Build
+    - name: Prepare Gradle
       run: |
-        ./gradlew clean
-        ./gradlew assembleDebug --no-daemon
-      continue-on-error: true
+        chmod +x gradlew
+        ./gradlew --version
+        
+    - name: Clean project
+      run: ./gradlew clean --no-daemon
       
-    - name: Locate and Collect APK
-      id: locate_apk
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --no-daemon --stacktrace
+      
+    - name: Collect APK
       run: |
-        mkdir -p final_output
-        APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null)
+        mkdir -p $GITHUB_WORKSPACE/apk-output
+        find . -path "*/build/outputs/apk/*/*.apk" -type f -exec cp {} $GITHUB_WORKSPACE/apk-output/ \;
+        ls -la $GITHUB_WORKSPACE/apk-output/
         
-        if [ -n "$APK_FILES" ]; then
-          echo "Found APK files:"
-          echo "$APK_FILES"
-          find . -name "*.apk" -type f -exec cp {} final_output/ \;
-          echo "found=true" >> $GITHUB_OUTPUT
-        else
-          echo "ERROR: No APK files found!"
-          echo "found=false" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: Upload APK Artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
-      if: steps.locate_apk.outputs.found == 'true'
       with:
-        name: Titan-CNC-APK
-        path: final_output/*.apk
-        retention-days: 7
-        
-    - name: Fail if no APK
-      if: steps.locate_apk.outputs.found == 'false'
-      run: |
-        echo "BUILD FAILED: No APK was generated"
-        exit 1
+        name: Titan-CNC-Debug-APK
+        path: apk-output/*.apk
+        if-no-files-found: error
