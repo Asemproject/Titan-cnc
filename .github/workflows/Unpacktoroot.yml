@@ -1,11 +1,10 @@
-
-name: Unpack ZIP to Repo Root
+name: Unpack ZIP to Root
 
 on:
   workflow_dispatch:
     inputs:
       zip_path:
-        description: 'Path file ZIP di dalam repo (contoh: archive.zip)'
+        description: 'Path file ZIP di repo (contoh: archive.zip)'
         required: true
         default: 'archive.zip'
       branch:
@@ -24,39 +23,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: true
           fetch-depth: 0
 
       - name: Install unzip
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y unzip
+        run: sudo apt-get update && sudo apt-get install -y unzip
 
       - name: Extract ZIP to root
-        env:
-          ZIP_PATH: ${{ inputs.zip_path }}
         run: |
-          if [ ! -f "$ZIP_PATH" ]; then
-            echo "File $ZIP_PATH tidak ditemukan!"
+          if [ ! -f "${{ inputs.zip_path }}" ]; then
+            echo "File ZIP tidak ditemukan!"
             exit 1
           fi
 
-          echo "Mengekstrak $ZIP_PATH ke root repo..."
-          unzip -o "$ZIP_PATH" -d .
+          echo "Mengekstrak ke root repo..."
+          unzip -o "${{ inputs.zip_path }}" -d .
 
-          echo "Hapus file ZIP setelah ekstrak (opsional)"
-          rm -f "$ZIP_PATH"
-
-      - name: Commit and Push changes
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add --all
+          git add -A
 
           if git diff --cached --quiet; then
             echo "Tidak ada perubahan."
           else
-            git commit -m "Auto extract ZIP to repo root"
+            git commit -m "Auto extract ${{ inputs.zip_path }} to root"
             git push origin ${{ inputs.branch }}
           fi
